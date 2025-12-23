@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>うんちクリッカー </title>
+<style>
+body { text-align:center; background-color:#f9f3db; font-family:Arial,sans-serif; margin:0; padding:0; position:relative; }
+button { padding:10px 20px; margin:5px; font-size:16px; cursor:pointer; }
+img { margin-top:20px; width:200px; cursor:pointer; }
+h1 { color:#d2691e; }
+.shop { margin-top:20px; }
+#menu, #game { margin-top:50px; }
+#hamburger { position:absolute; top:10px; right:10px; cursor:pointer; font-size:30px; z-index:100; }
+#resetConfirm { display:none; margin-top:20px; border:1px solid #ccc; padding:10px; background:#fff; }
+@keyframes rainbow { 0%{color:red;}16%{color:orange;}33%{color:yellow;}50%{color:green;}66%{color:blue;}83%{color:indigo;}100%{color:violet;} }
+#betaNameInput { font-weight:bold; animation:rainbow 3s infinite; }
+#adminButton { display:none; position:absolute; top:10px; left:10px; }
+#adminConsole { display:none; position:absolute; top:50px; left:10px; background:#fff; border:1px solid #ccc; padding:10px; width:250px; text-align:left; font-size:14px; }
+</style>
+</head>
+<body>
+
+<!-- メニュー -->
+<div id="menu">
+  <h1>🍪 クッキークリッカーへようこそ！</h1>
+  <p>クッキーの名前をつけて、ゲームを開始しよう！</p>
+  <input type="text" id="cookieNameInput" placeholder="クッキーの名前" maxlength="20">
+  <br><br>
+  <button onclick="startGame()">ゲーム開始</button><br><br>
+  <button onclick="showResetConfirm()">ゲームリセット</button>
+  <div id="resetConfirm">
+    <p>本当にリセットしますか？</p>
+    <button onclick="resetGame()">はい</button>
+    <button onclick="hideResetConfirm()">いいえ</button>
+  </div>
+</div>
+
+<!-- ゲーム画面 -->
+<div id="game" style="display:none;">
+  <div id="hamburger" onclick="showMenu()">☰</div>
+  <button id="adminButton" onclick="toggleAdminConsole()">管理者コマンド</button>
+
+  <h1>進化版クッキークリッカー</h1>
+  <p>自分のクッキー：<input type="text" id="cookieNameDisplayInput" value="" maxlength="20" oninput="changeName()"></p>
+  <p>クッキー数：<span id="cookies">0</span></p>
+  <p>1クリックで増えるクッキー：<span id="cookiesPerClick">1</span></p>
+  <img src="cookie.png" onclick="clickCookie()">
+
+  <div class="shop">
+    <h2>アップグレード・ショップ</h2>
+    <p>クリック強化（<span id="clickUpgradeCost">20</span>クッキー）</p>
+    <button onclick="upgradeClick()">クリック強化</button>
+    <p>自動装置1（<span id="autoClickersCost0">10</span>クッキー）</p>
+    <button onclick="buyAutoClicker(0)">購入</button>
+    <p>自動装置2（<span id="autoClickersCost1">50</span>クッキー）</p>
+    <button onclick="buyAutoClicker(1)">購入</button>
+  </div>
+  <p>自動装置1：<span id="autoClickers0">0</span></p>
+  <p>自動装置2：<span id="autoClickers1">0</span></p>
+
+  <!-- 管理者コマンドコンソール -->
+  <div id="adminConsole">
+    <input type="text" id="adminInput" placeholder="コマンドを入力" style="width:200px;">
+    <button onclick="runAdminCommand()">実行</button>
+    <p id="adminOutput" style="color:green;"></p>
+    <hr>
+    <strong>使えるコマンド:</strong>
+    <ul>
+      <li><code>add cookies 1000</code> - クッキーを任意の数だけ追加</li>
+      <li><code>add automatic equipment 10</code> - 自動装置を任意の数だけ追加</li>
+      <li><code>reset cookies</code> - クッキーを0にリセット</li>
+    </ul>
+    <strong>使用例:</strong>
+    <ul>
+      <li><code>add cookies 500</code> → クッキー500個追加</li>
+      <li><code>add automatic equipment 20</code> → 自動装置合計20個追加</li>
+      <li><code>reset cookies</code> → クッキー0に</li>
+    </ul>
+  </div>
+</div>
+
+<script>
+let cookies = Number(localStorage.getItem("cookies")||0);
+let cookiesPerClick = Number(localStorage.getItem("cookiesPerClick")||1);
+let autoClickers=[Number(localStorage.getItem("autoClickers0")||0), Number(localStorage.getItem("autoClickers1")||0)];
+let clickUpgradeCost = Number(localStorage.getItem("clickUpgradeCost")||20);
+let autoClickerCost=[Number(localStorage.getItem("autoClickersCost0")||10), Number(localStorage.getItem("autoClickersCost1")||50)];
+let autoClickerPower=[1,5];
+let cookieName = localStorage.getItem("cookieName")||"";
+
+function startGame(){
+  const nameInput = document.getElementById("cookieNameInput").value.trim();
+  if(nameInput!=="") cookieName=nameInput;
+  else if(!cookieName) cookieName="マイ・クッキー";
+
+  document.getElementById("menu").style.display="none";
+  document.getElementById("game").style.display="block";
+  document.getElementById("cookieNameDisplayInput").value=cookieName;
+
+  applyBetaFeatures();
+  updateDisplay();
+}
+
+function showMenu(){
+  document.getElementById("game").style.display="none";
+  document.getElementById("menu").style.display="block";
+  document.getElementById("cookieNameInput").value=cookieName;
+}
+
+function showResetConfirm(){document.getElementById("resetConfirm").style.display="block";}
+function hideResetConfirm(){document.getElementById("resetConfirm").style.display="none";}
+function resetGame(){
+  localStorage.clear();
+  cookies=0; cookiesPerClick=1; autoClickers=[0,0]; clickUpgradeCost=20; autoClickerCost=[10,50]; cookieName="";
+  hideResetConfirm(); document.getElementById("cookieNameInput").value="";
+  alert("ゲームがリセットされました！");
+  applyBetaFeatures();
+  updateDisplay();
+}
+
+function updateDisplay(){
+  document.getElementById("cookies").textContent=cookies;
+  document.getElementById("cookiesPerClick").textContent=cookiesPerClick;
+  document.getElementById("autoClickers0").textContent=autoClickers[0];
+  document.getElementById("autoClickers1").textContent=autoClickers[1];
+  document.getElementById("clickUpgradeCost").textContent=clickUpgradeCost;
+  document.getElementById("autoClickersCost0").textContent=autoClickerCost[0];
+  document.getElementById("autoClickersCost1").textContent=autoClickerCost[1];
+}
+
+function clickCookie(){ cookies+=cookiesPerClick; updateDisplay(); saveGame(); }
+function upgradeClick(){
+  if(cookies>=clickUpgradeCost){ cookies-=clickUpgradeCost; cookiesPerClick+=1; clickUpgradeCost=Math.floor(clickUpgradeCost*1.2); updateDisplay(); saveGame(); }
+  else alert("クッキーが足りません！");
+}
+function buyAutoClicker(i){
+  if(cookies>=autoClickerCost[i]){ cookies-=autoClickerCost[i]; autoClickers[i]+=1; autoClickerCost[i]=Math.floor(autoClickerCost[i]*1.2); updateDisplay(); saveGame(); }
+  else alert("クッキーが足りません！");
+}
+function saveGame(){
+  localStorage.setItem("cookies",cookies);
+  localStorage.setItem("cookiesPerClick",cookiesPerClick);
+  localStorage.setItem("clickUpgradeCost",clickUpgradeCost);
+  localStorage.setItem("autoClickers0",autoClickers[0]);
+  localStorage.setItem("autoClickers1",autoClickers[1]);
+  localStorage.setItem("autoClickersCost0",autoClickerCost[0]);
+  localStorage.setItem("autoClickersCost1",autoClickerCost[1]);
+  localStorage.setItem("cookieName",cookieName);
+}
+
+// Beta特典
+function applyBetaFeatures(){
+  if(cookieName==="I am a beta tester"){
+    document.body.style.backgroundColor="gold";
+    if(document.getElementById("cookieNameDisplayInput").id!=="betaNameInput")
+      document.getElementById("cookieNameDisplayInput").id="betaNameInput";
+    document.getElementById("betaNameInput").value=cookieName;
+    document.getElementById("adminButton").style.display="block";
+  } else {
+    document.body.style.backgroundColor="#f9f3db";
+    if(document.getElementById("betaNameInput")) document.getElementById("betaNameInput").id="cookieNameDisplayInput";
+    document.getElementById("cookieNameDisplayInput").value=cookieName;
+    document.getElementById("adminButton").style.display="none";
+  }
+}
+
+// 名前変更
+function changeName(){
+  const newName=document.getElementById("cookieNameDisplayInput").value.trim();
+  cookieName=newName||"マイ・クッキー";
+  localStorage.setItem("cookieName",cookieName);
+  applyBetaFeatures();
+}
+
+// 管理者コマンド
+function toggleAdminConsole(){
+  const consoleDiv=document.getElementById("adminConsole");
+  consoleDiv.style.display = consoleDiv.style.display==="none"?"block":"none";
+}
+function runAdminCommand(){
+  const input = document.getElementById("adminInput").value.trim();
+  const output = document.getElementById("adminOutput");
+  if(input===""){ output.textContent="コマンドを入力してください。"; return; }
+  const parts = input.split(" ");
+
+  // add cookies 数字
+  if(parts[0].toLowerCase()==="add" && parts[1].toLowerCase()==="cookies"){
+    const num = parseInt(parts[2]);
+    if(!isNaN(num) && num>0){ cookies += num; output.textContent=`クッキーを${num}追加しました！`; }
+    else output.textContent="正しい数値を指定してください。例: add cookies 1000";
+  }
+  // add automatic equipment 数字
+  else if(parts[0].toLowerCase()==="add" && parts[1].toLowerCase()==="automatic" && parts[2].toLowerCase()==="equipment"){
+    const num = parseInt(parts[3]);
+    if(!isNaN(num) && num>0){
+      const half = Math.floor(num/2);
+      autoClickers[0]+=half;
+      autoClickers[1]+=(num-half);
+      output.textContent=`自動装置を合計${num}個追加しました！`;
+    } else output.textContent="正しい数値を指定してください。例: add automatic equipment 10";
+  }
+  // reset cookies
+  else if(parts[0].toLowerCase()==="reset" && parts[1].toLowerCase()==="cookies"){
+    cookies=0; output.textContent="クッキーをリセットしました。";
+  }
+  else output.textContent="不明なコマンドです。";
+
+  updateDisplay(); saveGame();
+}
+
+// 自動クッキー増加
+setInterval(()=>{ for(let i=0;i<autoClickers.length;i++) cookies+=autoClickers[i]*autoClickerPower[i]; updateDisplay(); saveGame(); },1000);
+</script>
+
+</body>
+</html>
